@@ -4,9 +4,11 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/restaurant_provider.dart';
 import '../providers/achievement_provider.dart';
 import '../widgets/dialog_box.dart';
+import '../utils/page_transitions.dart';
 import 'merge_game_screen.dart';
 import 'decoration_screen.dart';
 import 'achievement_screen.dart';
+import 'level_select_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -154,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const AchievementScreen()),
+            PageTransitions.scaleTransition(const AchievementScreen()),
           );
         },
         backgroundColor: Colors.amber,
@@ -299,18 +301,28 @@ class _HomeScreenState extends State<HomeScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           _buildGameButton(
-                            '🎮 开始游戏',
+                            '🎯 关卡挑战',
+                            '100个关卡等你挑战',
+                            Colors.indigo,
+                            () {
+                              Navigator.push(
+                                context,
+                                PageTransitions.slideAndFadeTransition(const LevelSelectScreen()),
+                              );
+                            },
+                          ).animate().fadeIn(delay: 400.ms, duration: 400.ms).slideX(begin: -0.2, end: 0),
+                          const SizedBox(height: 16),
+                          _buildGameButton(
+                            '🎮 自由模式',
                             '合成食材，招待顾客',
                             Colors.green,
                             () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (context) => const MergeGameScreen(),
-                                ),
+                                PageTransitions.slideAndFadeTransition(const MergeGameScreen()),
                               );
                             },
-                          ).animate().fadeIn(delay: 400.ms, duration: 400.ms).slideX(begin: -0.2, end: 0),
+                          ).animate().fadeIn(delay: 450.ms, duration: 400.ms).slideX(begin: -0.2, end: 0),
                           const SizedBox(height: 16),
                           _buildGameButton(
                             '🏠 装修餐厅',
@@ -319,12 +331,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (context) => const DecorationScreen(),
-                                ),
+                                PageTransitions.slideAndFadeTransition(const DecorationScreen()),
                               );
                             },
-                          ).animate().fadeIn(delay: 500.ms, duration: 400.ms).slideX(begin: -0.2, end: 0),
+                          ).animate().fadeIn(delay: 550.ms, duration: 400.ms).slideX(begin: -0.2, end: 0),
                           const SizedBox(height: 16),
                           _buildGameButton(
                             '📖 故事剧情',
@@ -333,7 +343,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             () {
                               _showStoryDialog();
                             },
-                          ).animate().fadeIn(delay: 600.ms, duration: 400.ms).slideX(begin: -0.2, end: 0),
+                          ).animate().fadeIn(delay: 650.ms, duration: 400.ms).slideX(begin: -0.2, end: 0),
                         ],
                       ),
                     ),

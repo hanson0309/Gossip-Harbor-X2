@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/restaurant_provider.dart';
 import '../models/restaurant.dart';
 import '../widgets/dialog_box.dart';
+import '../utils/page_transitions.dart';
 import 'merge_game_screen.dart';
 
 class DecorationScreen extends StatefulWidget {
@@ -25,7 +26,7 @@ class _DecorationScreenState extends State<DecorationScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
             Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const MergeGameScreen()),
+              PageTransitions.slideAndFadeTransition(const MergeGameScreen()),
             );
           },
         ),

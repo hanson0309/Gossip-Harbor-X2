@@ -42,10 +42,15 @@ class GameProvider with ChangeNotifier {
   List<Customer> customers = [];
   Timer? customerTimer;
   final Random _random = Random();
+  int _maxConcurrentCustomers = 3;
   
   GameProvider() {
     _initializeGame();
     _startCustomerSpawning();
+  }
+
+  void setMaxConcurrentCustomers(int value) {
+    _maxConcurrentCustomers = value.clamp(1, 12);
   }
 
   void _initializeGame() {
@@ -53,6 +58,21 @@ class GameProvider with ChangeNotifier {
     for (int i = 0; i < 3; i++) {
       _addRandomFood();
     }
+  }
+
+  void resetForNewGame() {
+    // 重置网格、统计和顾客，用于开始新的关卡或新一局
+    grid = List.generate(
+      7,
+      (i) => List.generate(5, (j) => GridItem()),
+    );
+    selectedRow = null;
+    selectedCol = null;
+    totalMerges = 0;
+    highestLevel = 1;
+    customers.clear();
+    _initializeGame();
+    notifyListeners();
   }
 
   bool serveCustomerWithTile(Customer customer, int row, int col) {
@@ -232,7 +252,7 @@ class GameProvider with ChangeNotifier {
   }
 
   void _spawnCustomer() {
-    if (customers.length >= 3) return; // 最多3个顾客
+    if (customers.length >= _maxConcurrentCustomers) return; // 最多指定数量的顾客
     
     var nameData = CustomerDatabase.customerNames[
       _random.nextInt(CustomerDatabase.customerNames.length)

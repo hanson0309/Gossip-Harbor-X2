@@ -104,14 +104,18 @@ class RestaurantProvider with ChangeNotifier {
     return restaurant.unlockedFurniture.contains(furnitureId);
   }
 
-  // 使用体力生成食材
-  bool useEnergyToGenerateFood(int energyCost) {
-    if (restaurant.useEnergy(energyCost)) {
+  bool useEnergy(int amount) {
+    if (restaurant.useEnergy(amount)) {
       _saveData();
       notifyListeners();
       return true;
     }
     return false;
+  }
+
+  // 使用体力生成食材
+  bool useEnergyToGenerateFood(int energyCost) {
+    return useEnergy(energyCost);
   }
 
   // 手动更新体力（用于UI刷新）

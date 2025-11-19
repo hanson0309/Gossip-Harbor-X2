@@ -4,12 +4,22 @@ import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/game_provider.dart';
 import '../providers/restaurant_provider.dart';
+import '../providers/level_provider.dart';
+import '../models/level.dart';
 import '../widgets/food_tile.dart';
+import '../utils/page_transitions.dart';
 import 'decoration_screen.dart';
 import 'achievement_screen.dart';
 
 class MergeGameScreen extends StatefulWidget {
-  const MergeGameScreen({Key? key}) : super(key: key);
+  final bool isLevelMode;
+  final Level? level;
+
+  const MergeGameScreen({
+    Key? key,
+    this.isLevelMode = false,
+    this.level,
+  }) : super(key: key);
 
   @override
   State<MergeGameScreen> createState() => _MergeGameScreenState();
@@ -17,24 +27,53 @@ class MergeGameScreen extends StatefulWidget {
 
 class _MergeGameScreenState extends State<MergeGameScreen> {
   Timer? _gameTimer;
+  int? _remainingSeconds;
+  int _currentScore = 0;
+  bool _isLevelFinished = false;
 
   @override
   void initState() {
     super.initState();
+
+    final gameProvider = context.read<GameProvider>();
+    gameProvider.resetForNewGame();
+
+    if (widget.isLevelMode && widget.level != null) {
+      final level = widget.level!;
+      _remainingSeconds = level.timeLimit;
+      gameProvider.setMaxConcurrentCustomers(level.customerCount);
+    } else {
+      // 自由模式使用默认的顾客上限
+      gameProvider.setMaxConcurrentCustomers(3);
+    }
+
     _startGameTimer();
   }
 
   void _startGameTimer() {
     _gameTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
-        final gameProvider = context.read<GameProvider>();
-        final restaurantProvider = context.read<RestaurantProvider>();
-        
-        // 更新顾客耐心
-        gameProvider.updateCustomerPatience();
-        
-        // 更新体力（每秒检查一次）
-        restaurantProvider.updateEnergy();
+      if (!mounted) return;
+
+      final gameProvider = context.read<GameProvider>();
+      final restaurantProvider = context.read<RestaurantProvider>();
+      
+      // 更新顾客耐心
+      gameProvider.updateCustomerPatience();
+      
+      // 更新体力（每秒检查一次）
+      restaurantProvider.updateEnergy();
+
+      // 关卡模式倒计时
+      if (widget.isLevelMode && !_isLevelFinished && _remainingSeconds != null) {
+        if (_remainingSeconds! > 0) {
+          setState(() {
+            _remainingSeconds = _remainingSeconds! - 1;
+          });
+          if (_remainingSeconds! <= 0) {
+            final success = widget.level != null && _currentScore >= widget.level!.requiredScore;
+            _onLevelEnd(success);
+          }
+        }
       }
     });
   }
@@ -53,7 +92,7 @@ class _MergeGameScreenState extends State<MergeGameScreen> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const AchievementScreen()),
+            PageTransitions.scaleTransition(const AchievementScreen()),
           );
         },
         backgroundColor: Colors.amber[600],
@@ -63,14 +102,18 @@ class _MergeGameScreenState extends State<MergeGameScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => const DecorationScreen()),
-            );
+            if (widget.isLevelMode) {
+              Navigator.of(context).pop();
+            } else {
+              Navigator.of(context).pushReplacement(
+                PageTransitions.slideAndFadeTransition(const DecorationScreen()),
+              );
+            }
           },
         ),
-        title: const Text(
-          '🍽️',
-          style: TextStyle(fontSize: 28),
+        title: Text(
+          widget.isLevelMode && widget.level != null ? '关卡 ${widget.level!.levelNumber}' : '🍽️',
+          style: const TextStyle(fontSize: 28),
         ),
         centerTitle: false,
         flexibleSpace: Container(
@@ -122,6 +165,9 @@ class _MergeGameScreenState extends State<MergeGameScreen> {
       ),
       body: Column(
         children: [
+          if (widget.isLevelMode && widget.level != null)
+            _buildLevelStatusBar(),
+
           // 顶部：顾客横向排列
           Consumer<GameProvider>(
             builder: (context, game, child) {
@@ -275,6 +321,140 @@ class _MergeGameScreenState extends State<MergeGameScreen> {
     );
   }
 
+  Widget _buildLevelStatusBar() {
+    final level = widget.level!;
+    final remaining = _remainingSeconds ?? level.timeLimit;
+    final minutes = remaining ~/ 60;
+    final seconds = remaining % 60;
+    final timeText =
+        '${minutes.toString().padLeft(1, '0')}:${seconds.toString().padLeft(2, '0')}';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.timer, color: Colors.redAccent, size: 20),
+              const SizedBox(width: 4),
+              Text(
+                timeText,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              const Icon(Icons.emoji_events, color: Colors.orange, size: 20),
+              const SizedBox(width: 4),
+              Text(
+                '$_currentScore / ${level.requiredScore}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _addScore(int value) {
+    if (!widget.isLevelMode || _isLevelFinished) return;
+
+    setState(() {
+      _currentScore += value;
+    });
+
+    if (widget.level != null && _currentScore >= widget.level!.requiredScore) {
+      _onLevelEnd(true);
+    }
+  }
+
+  void _onLevelEnd(bool success) {
+    if (!widget.isLevelMode || widget.level == null) return;
+    if (_isLevelFinished) return;
+
+    _isLevelFinished = true;
+    _gameTimer?.cancel();
+
+    final level = widget.level!;
+    final levelProvider = context.read<LevelProvider>();
+    final restaurant = context.read<RestaurantProvider>();
+
+    if (success) {
+      levelProvider.completeLevel(level.levelNumber, _currentScore);
+      restaurant.earnCoins(level.coinReward);
+      restaurant.earnExperience(level.expReward);
+    }
+
+    final reachedScore = _currentScore >= level.requiredScore;
+    final stars = reachedScore
+        ? Level.calculateStars(_currentScore, level.requiredScore)
+        : 0;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(success ? '关卡通过！' : '挑战结束'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('得分：$_currentScore / ${level.requiredScore}'),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(3, (i) {
+                  return Icon(
+                    i < stars ? Icons.star : Icons.star_border,
+                    color: Colors.amber,
+                  );
+                }),
+              ),
+              if (success) ...[
+                const SizedBox(height: 12),
+                Text('奖励：${level.coinReward} 金币，${level.expReward} 经验'),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).pop();
+              },
+              child: const Text('返回关卡选择'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildStatusChip(IconData icon, String text, Color color) {
     // 根据图标类型选择不同的动画
     Widget animatedIcon;
@@ -387,8 +567,12 @@ class _MergeGameScreenState extends State<MergeGameScreen> {
         final served = game.serveCustomerWithTile(customer, fromRow, fromCol);
         if (served) {
           final restaurant = context.read<RestaurantProvider>();
-          restaurant.earnCoins(customer.requestedFood.price + customer.tip);
+          final reward = customer.requestedFood.price + customer.tip;
+          restaurant.earnCoins(reward);
           restaurant.earnExperience(customer.requestedFood.level * 10);
+          if (widget.isLevelMode) {
+            _addScore(reward);
+          }
         }
       },
       builder: (context, candidateData, rejectedData) {
